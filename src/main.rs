@@ -38,6 +38,7 @@ fn edit_mode() {
     stdout().flush().unwrap();
     let pw = rpassword::prompt_password("> ").unwrap();
     let mc = new_magic_crypt!(pw,256);
+    println!("{}","=".repeat(50));
     let json = match decript_file_to_json(&mc,&Path::new(DB_NAME)) {
         Ok(json) => Some(json),
         Err(_) => None
