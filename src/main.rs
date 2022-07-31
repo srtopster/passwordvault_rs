@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::io::{Write,Read,BufReader,BufWriter,stdin,stdout};
 use std::path::Path;
 use std::fs::File;
-use std::process;
+use std::{process,env};
 use magic_crypt::{new_magic_crypt,MagicCryptTrait};
 use serde_json;
 use colored::*;
@@ -10,7 +10,7 @@ use rpassword;
 use passwords::PasswordGenerator;
 use clipboard::{ClipboardContext,ClipboardProvider};
 mod windows_color;
-use crossterm::{terminal::SetTitle,ExecutableCommand};
+use crossterm::{terminal::{SetTitle,Clear,ClearType},cursor::MoveTo,ExecutableCommand};
 
 const DB_NAME: &str = "crypt.db";
 
@@ -28,6 +28,85 @@ fn wrong_pass(){
     stdout().flush().unwrap();
     stdin().read(&mut [0u8]).unwrap();
     process::exit(1);
+}
+
+fn edit_mode() {
+    println!("{}","=".repeat(50));
+    println!("{}","Bem vindo ao modo de edição".bright_cyan());
+    println!("{}","=".repeat(50));
+    println!("Digite a senha para o banco de dados: ");
+    stdout().flush().unwrap();
+    let pw = rpassword::prompt_password("> ").unwrap();
+    let mc = new_magic_crypt!(pw,256);
+    let json = match decript_file_to_json(&mc,&Path::new(DB_NAME)) {
+        Ok(json) => Some(json),
+        Err(_) => None
+    };
+    if json == None {
+        wrong_pass();
+    }
+    let mut json = json.unwrap();
+    for (num,k_v) in json.iter().enumerate() {
+        println!("[{}] {}\n[>] {}",num,k_v.0.bright_green().underline(),k_v.1.bright_red())
+    }
+    println!("Digite a linha que você quer editar:");
+    print!("> ");
+    let ch1 = read_input();
+    if ch1.parse::<usize>().is_ok() && ch1.parse::<usize>().as_ref().unwrap() <= &(&json.len()-1) {
+        let lock = ch1.parse::<usize>().unwrap();
+        println!("{}","=".repeat(50));
+        println!("Selecionado:\n[{}] {}\n[>] {}",lock,json.iter().nth(lock).unwrap().0.bright_green(),json.iter().nth(lock).unwrap().1.bright_red());
+        println!("Deseja:\n1 - Editar\n2 - Remover\n3 - Sair");
+        print!("> ");
+        let ch2 = read_input();
+        println!("{}","=".repeat(50));
+        if ch2 == "1" {
+            println!("Digite o novo nome/user:");
+            print!("> ");
+            let title = read_input();
+            stdout().flush().unwrap();
+            let upw1 = rpassword::prompt_password("Digite a nova senha: ").unwrap();
+            stdout().flush().unwrap();
+            let upw2 = rpassword::prompt_password("Repita a senha: ").unwrap();
+            if upw1 != upw2 {println!("{}","As senhas não combimam.".bright_red());process::exit(1)}
+            println!("Deseja salvar: [y/n]");
+            print!("> ");
+            let ch3 = read_input().to_lowercase();
+            if ch3 != "y" {
+                println!("Processo cancelado.");
+                process::exit(0)
+            }
+            println!("{}","=".repeat(50));
+            println!("{}","Editando...".bright_cyan());
+            json.remove(&json.iter().nth(lock).unwrap().0.to_owned()).unwrap();
+            json.insert(title, upw1);
+            println!("{}","Encriptando...".bright_cyan());
+            encript_json_to_file(&mc,Path::new(DB_NAME), json);
+            println!("{}","Salvo com sucesso.".bright_green());
+            process::exit(0);
+        }else if ch2 == "2" {
+            println!("Deseja remover: [y/n]");
+            print!("> ");
+            let ch3 = read_input();
+            if ch3 != "y" {
+                println!("Processo cancelado.");
+                process::exit(0)
+            }
+            println!("{}","=".repeat(50));
+            println!("{}","Removendo...".bright_cyan());
+            json.remove(&json.iter().nth(lock).unwrap().0.to_owned()).unwrap();
+            println!("{}","Encriptando...".bright_cyan());
+            encript_json_to_file(&mc,Path::new(DB_NAME), json);
+            println!("{}","Salvo com sucesso.".bright_green());
+            process::exit(0);
+        }else {
+            println!("Saindo.");
+            process::exit(0);
+        }
+    }else {
+        println!("{}","Erro ao selecionar.".bright_red());
+        process::exit(0)
+    }
 }
 
 fn show_on_terminal(mc: &magic_crypt::MagicCrypt256) {
@@ -125,8 +204,16 @@ fn encript_json_to_file(mc: &magic_crypt::MagicCrypt256,path: &Path,json: BTreeM
 }
 
 fn main() {
-    stdout().execute(SetTitle("Password Vault")).unwrap();
+    stdout()
+    .execute(Clear(ClearType::All)).unwrap()
+    .execute(MoveTo(0,0)).unwrap()
+    .execute(SetTitle("Password Vault")).unwrap();
     windows_color::enable_ansi_support().expect("Falha ao setar cores para windows.");
+    
+    let args: Vec<String> = env::args().collect();
+    if args.len() > 1 && args[1] == "--edit" {
+        edit_mode()
+    }
     if !Path::new(DB_NAME).exists() {
         File::create(DB_NAME).unwrap();
         println!("{}","Arquivo crypt.db criado.".bright_green())
@@ -179,7 +266,7 @@ fn main() {
         let upw1 = rpassword::prompt_password("Digite a senha: ").unwrap();
         stdout().flush().unwrap();
         let upw2 = rpassword::prompt_password("Repita a senha: ").unwrap();
-        if upw1 != upw2 {println!("As senhas não combimam.");process::exit(1)}
+        if upw1 != upw2 {println!("{}","As senhas não combimam.".bright_red());process::exit(1)}
         println!("{}","=".repeat(50));
         println!("Digite a senha para o banco de dados: ");
         stdout().flush().unwrap();
