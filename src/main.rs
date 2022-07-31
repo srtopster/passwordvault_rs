@@ -39,7 +39,7 @@ fn show_on_terminal(mc: &magic_crypt::MagicCrypt256) {
         wrong_pass();
     }
     for (num,k_v) in json.unwrap().iter().enumerate() {
-        println!("[{}] {:20} : {:}",num,k_v.0,k_v.1)
+        println!("[{}] {}\n[>] {}",num,k_v.0.bright_green().underline(),k_v.1.bright_red())
     }
 }
 
