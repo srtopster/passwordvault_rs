@@ -6,7 +6,7 @@ use std::{process,env};
 use magic_crypt::{new_magic_crypt,MagicCryptTrait};
 use serde_json;
 use colored::*;
-use rpassword;
+use inquire::{Select,Password,PasswordDisplayMode,validator::Validation};
 use passwords::PasswordGenerator;
 use clipboard::{ClipboardContext,ClipboardProvider};
 mod windows_color;
@@ -30,13 +30,32 @@ fn wrong_pass(){
     process::exit(1);
 }
 
+fn password_twice(text_promp: &str) -> String {
+    let pw1 = Password::new(text_promp)
+    .with_display_mode(PasswordDisplayMode::Masked)
+    .prompt()
+    .expect("Falha ao ler senha");
+
+    let validator = move |input: &str| if input != pw1 {
+        Ok(Validation::Invalid("As senhas devem combinar !".into()))
+    } else {
+        Ok(Validation::Valid)
+    };
+
+    let pw2 = Password::new("Repita a senha:")
+    .with_display_mode(PasswordDisplayMode::Masked)
+    .with_validator(validator)
+    .prompt()
+    .expect("Falha ao ler senha");
+    
+    pw2
+}
+
 fn edit_mode() {
     println!("{}","=".repeat(50));
     println!("{}","Bem vindo ao modo de edição".bright_cyan());
     println!("{}","=".repeat(50));
-    println!("Digite a senha para o banco de dados: ");
-    stdout().flush().unwrap();
-    let pw = rpassword::prompt_password("> ").unwrap();
+    let pw = Password::new("Digite a senha para o banco de dados:\n>").with_display_mode(PasswordDisplayMode::Masked).prompt().expect("Erro ao ler senha");
     let mc = new_magic_crypt!(pw,256);
     println!("{}","=".repeat(50));
     let json = match decript_file_to_json(&mc,&Path::new(DB_NAME)) {
@@ -66,10 +85,7 @@ fn edit_mode() {
             print!("> ");
             let title = read_input();
             stdout().flush().unwrap();
-            let upw1 = rpassword::prompt_password("Digite a nova senha: ").unwrap();
-            stdout().flush().unwrap();
-            let upw2 = rpassword::prompt_password("Repita a senha: ").unwrap();
-            if upw1 != upw2 {println!("{}","As senhas não combimam.".bright_red());process::exit(1)}
+            let upw1 = password_twice("Digite a nova senha:");
             println!("Deseja salvar: [y/n]");
             print!("> ");
             let ch3 = read_input().to_lowercase();
@@ -205,20 +221,29 @@ fn encript_json_to_file(mc: &magic_crypt::MagicCrypt256,path: &Path,json: BTreeM
 }
 
 fn main() {
+    //abilita suporte para ansi
     stdout()
     .execute(Clear(ClearType::All)).unwrap()
     .execute(MoveTo(0,0)).unwrap()
     .execute(SetTitle("Password Vault")).unwrap();
     windows_color::enable_ansi_support().expect("Falha ao setar cores para windows.");
     
-    let args: Vec<String> = env::args().collect();
-    if args.len() > 1 && args[1] == "--edit" {
-        edit_mode()
+    //check do --edit mode
+    match env::args().nth(1) {
+        Some(arg) => {
+            if arg == "--edit" {
+                edit_mode()
+            }
+        }
+        None => {}
     }
+
+    //se crypt.db não existir é criado
     if !Path::new(DB_NAME).exists() {
         File::create(DB_NAME).unwrap();
         println!("{}","Arquivo crypt.db criado.".bright_green())
     }
+    //avisa para criar uma senha
     if File::open(Path::new(DB_NAME)).unwrap().metadata().unwrap().len() == 0 {
         println!("{}","================================= ATENÇÃO =================================".bright_red());
         println!("{}",format!("O arquivo {} está vazio.",DB_NAME).bright_red());
@@ -226,56 +251,50 @@ fn main() {
         println!("{}","A senha usada para acessar o banco de dados será a senha sua futura senha.".bright_red());
         println!("{}","===========================================================================".bright_red());
     }
+    //inicio
     println!("{}","=".repeat(50));
     println!("{}","Bem Vindo ao Password Vault".bright_cyan());
     println!("{}","=".repeat(50));
-    println!("1 - Acessar o banco de dados");
-    println!("2 - Adicionar uma senha customizada");
-    println!("3 - Gerar uma senha");
-    print!("> ");
-    let ch1 = read_input();
+    let sel_opts = vec!["Acessar o banco de dados","Adicionar uma senha customizada","Gerar uma senha"];
+    let sel = Select::new("",sel_opts.to_owned()).with_help_message("↑↓ para mover, enter para selecionar").prompt().expect("Falha ao selecionar");
     println!("{}","=".repeat(50));
-    if ch1 == "1" {
+
+    if sel == sel_opts[0] {
+        //acesso ao banco de dados
         println!("{}","Deseja".bright_cyan());
         println!("{}","=".repeat(50));
-        println!("1 - Mostrar no programa (Seguro)");
-        println!("2 - Extrair para um .txt (Não seguro)");
-        print!("> ");
-        let ch2 = read_input();
-        if ch2 != "1" && ch2 != "2" {println!("Insira uma opção valida.");process::exit(1)}
+        let sel_opts = vec!["Mostrar no programa (Seguro)","Extrair para um .txt (Não seguro)"];
+        let sel = Select::new("",sel_opts.to_owned()).with_help_message("↑↓ para mover, enter para selecionar").prompt().expect("Falha ao selecionar");
         println!("{}","=".repeat(50));
-        println!("Digite a senha para o banco de dados:");
-        stdout().flush().unwrap();
-        let pw = rpassword::prompt_password("> ").unwrap();
+        let pw = Password::new("Digite a senha para o banco de dados:\n>").with_display_mode(PasswordDisplayMode::Masked).prompt().expect("Falha ao ler senha");
         println!("{}","=".repeat(50));
         let mc = new_magic_crypt!(pw,256);
         println!("{}","Decriptando...".bright_cyan());
         println!("{}","=".repeat(50));
-        if ch2 == "1" {
+        if sel == sel_opts[0] {
             show_on_terminal(&mc);
-        }else if ch2 == "2" {
+        }else if sel == sel_opts[1] {
             extract_to_txt(&mc)
         }
         println!("{}","=".repeat(50));
         println!("{}","Decriptado com sucesso.".bright_green());
         println!("{}","=".repeat(50));
-    }else if ch1 == "2" {
+    
+    }else if sel == sel_opts[1] {
+        //adiciona uma senha
         println!("Digite um nome/user para essa senha:");
         print!("> ");
         let title = read_input();
         stdout().flush().unwrap();
-        let upw1 = rpassword::prompt_password("Digite a senha: ").unwrap();
-        stdout().flush().unwrap();
-        let upw2 = rpassword::prompt_password("Repita a senha: ").unwrap();
-        if upw1 != upw2 {println!("{}","As senhas não combimam.".bright_red());process::exit(1)}
+        let upw1 = password_twice("Digite a senha:");
         println!("{}","=".repeat(50));
-        println!("Digite a senha para o banco de dados: ");
-        stdout().flush().unwrap();
-        let pw = rpassword::prompt_password("> ").unwrap();
+        let pw = Password::new("Digite a senha para o banco de dados:\n>").with_display_mode(PasswordDisplayMode::Masked).prompt().expect("Falha ao ler senha");
         println!("{}","=".repeat(50));
         let mc = new_magic_crypt!(pw,256);
         save_password(&mc, title, upw1)
-    }else if ch1 == "3" {
+
+    }else if sel == sel_opts[2] {
+        //gera uma senha
         println!("Digite o tamanho da senha: ");
         print!("> ");
         let pass_length = read_input();
@@ -289,9 +308,11 @@ fn main() {
         println!("Sua senha: {}",rngpass.bright_green());
         println!("Senha copiada para a área de transferência.");
         println!("{}","=".repeat(50));
+
     }else {
         println!("{}","Insira uma opção valida.".bright_red())
     }
+    //espera uma tecla ser apertada para sair
     println!("Aperte enter para sair.");
     stdout().flush().unwrap();
     stdin().read(&mut [0u8]).unwrap();

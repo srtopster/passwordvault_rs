@@ -12,12 +12,12 @@ build = "build.rs"
 #clearscreen = "1.0.10"
 magic-crypt = "3.1.10"
 serde_json = {version="1.0.82",features=["preserve_order"]}
-rpassword = "7.0.0"
 colored = "2.0.0"
 passwords = "3.1.9"
 clipboard = "0.5.0"
 winapi = {version="0.3.9",features=["errhandlingapi"]}
 crossterm = "0.24.0"
+inquire = "0.3.0"
 
 [target.'cfg(windows)'.build-dependencies]
 winres = "0.1.12"
