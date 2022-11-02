@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use std::io::{Write,Read,BufReader,BufWriter,stdin,stdout};
 use std::path::Path;
 use std::fs::File;
@@ -11,6 +10,7 @@ use passwords::PasswordGenerator;
 use clipboard::{ClipboardContext,ClipboardProvider};
 mod windows_color;
 use crossterm::{terminal::{SetTitle,Clear,ClearType},cursor::MoveTo,ExecutableCommand};
+use indexmap::IndexMap;
 
 const DB_NAME: &str = "crypt.db";
 
@@ -145,7 +145,7 @@ fn save_password(mc: &magic_crypt::MagicCrypt256,title: String,pass: String) {
         Ok(json) => Some(json),
         Err(_) => {
             if File::open(Path::new(DB_NAME)).unwrap().metadata().unwrap().len() == 0 {
-                let new: BTreeMap<String, String> = BTreeMap::new();
+                let new: IndexMap<String, String> = IndexMap::new();
                 Some(new)
             }else {
                 None
@@ -200,11 +200,11 @@ fn random_password(size: usize) -> String {
     pg.generate(1).unwrap()[0].to_owned()
 }
 
-fn decript_file_to_json(mc: &magic_crypt::MagicCrypt256,path: &Path) -> Result<BTreeMap<String,String>, magic_crypt::MagicCryptError>{
+fn decript_file_to_json(mc: &magic_crypt::MagicCrypt256,path: &Path) -> Result<IndexMap<String,String>, magic_crypt::MagicCryptError>{
     let in_file = File::open(path).unwrap();
     match mc.decrypt_reader_to_bytes(&mut BufReader::new(in_file)) {
         Ok(bytes) => {
-            let json: BTreeMap<String,String> = serde_json::from_slice(&bytes).unwrap();
+            let json: IndexMap<String,String> = serde_json::from_slice(&bytes).unwrap();
             return Ok(json)
         },
         Err(error) => {
@@ -213,7 +213,7 @@ fn decript_file_to_json(mc: &magic_crypt::MagicCrypt256,path: &Path) -> Result<B
     }
 }
 
-fn encript_json_to_file(mc: &magic_crypt::MagicCrypt256,path: &Path,json: BTreeMap<String,String>){
+fn encript_json_to_file(mc: &magic_crypt::MagicCrypt256,path: &Path,json: IndexMap<String,String>){
     let out_file = File::create(path).expect("Não foi possivel criar o arquivo.");
     let buffer = serde_json::to_vec_pretty(&json).unwrap();
     let enc_bytes = mc.encrypt_bytes_to_bytes(&buffer);

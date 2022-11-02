@@ -18,6 +18,7 @@ clipboard = "0.5.0"
 winapi = {version="0.3.9",features=["errhandlingapi"]}
 crossterm = "0.24.0"
 inquire = "0.3.0"
+indexmap = {version="1.9.1",features=["serde-1"]}
 
 [target.'cfg(windows)'.build-dependencies]
 winres = "0.1.12"
