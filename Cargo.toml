@@ -2,7 +2,7 @@
 name = "password_vault"
 authors = ["Topster_"]
 license = "Unlicense"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -20,5 +20,6 @@ crossterm = "0.24.0"
 inquire = "0.3.0"
 indexmap = {version="1.9.1",features=["serde-1"]}
 
-[target.'cfg(windows)'.build-dependencies]
+#[target.'cfg(windows)'.build-dependencies]
+[build-dependencies]
 winres = "0.1.12"
